@@ -38,28 +38,38 @@
   * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
   * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   *
+  * 通过查阅Cortex M4内核手册 的指令集，
   ******************************************************************************
   */
-    
+  // unified assembler language 简称为UAL 是为了兼容THUMB 和 ARM两种指令集而产生的一种统一汇编语言
+  // 汇编语言分为（pre-unified 和 unified）,pre-unified指的是unified之前的汇编语法风格。
+  // 所需的编译语言的语法取决于所选择的开发工具，keil 中 MDK-ARM 同时支持上述两种语法。
+  // 所以启动文件的编写与开发平台有关 
+  // 但是指令集与处理器的架构有关
+  // 所以汇编语言分为：语法风格和指令集两个部分
+
   .syntax unified
   .cpu cortex-m4
   .fpu softvfp
   .thumb
-
+/*定义一个全局性的符号 */
 .global  g_pfnVectors
 .global  Default_Handler
 
 /* start address for the initialization values of the .data section. 
 defined in linker script */
-.word  _sidata
+.word  _sidata // 定义一个字的变量 ， 这个变量的具体值在链接脚本之中
+
 /* start address for the .data section. defined in linker script */  
 .word  _sdata
 /* end address for the .data section. defined in linker script */
 .word  _edata
+
 /* start address for the .bss section. defined in linker script */
 .word  _sbss
 /* end address for the .bss section. defined in linker script */
 .word  _ebss
+
 /* stack used for SystemInit_ExtMemCtl; always internal RAM used */
 
 /**
@@ -69,30 +79,40 @@ defined in linker script */
  *          supplied main() routine is called. 
  * @param  None
  * @retval : None
+ * 程序刚上电时调用的第一个程序，也就是复位
 */
-
-    .section  .text.Reset_Handler
+      .section  .text.Reset_Handler
+  /*这里的weak 类似于c语言中的weak 如果c中没有定义，那么这里默认的Reset_Handler将被调用 */
   .weak  Reset_Handler
   .type  Reset_Handler, %function
 Reset_Handler:  
   ldr   sp, =_estack     /* set stack pointer */
 
 /* Copy the data segment initializers from flash to SRAM */  
+/*
+    MEMORY
+    ROM (rx) : ORIGIN = 0x08000000, LENGTH =  1024k / 1024K flash /
+    RAM (rw) : ORIGIN = 0x20000000, LENGTH =  128k  / 128K sram /
+    
+ */
   movs  r1, #0
-  b  LoopCopyDataInit
+  b  LoopCopyDataInit /* 无条件跳转到对应的标签 */
 
+/* 数据段初始化，将代码段中的rw-data和zi-data段加载到sram中 为程序运行做准备 */
 CopyDataInit:
   ldr  r3, =_sidata
-  ldr  r3, [r3, r1]
-  str  r3, [r0, r1]
-  adds  r1, r1, #4
+  ldr  r3, [r3, r1]   // 加载地址 [r3+r1] 中的数据到 r3寄存器
+  str  r3, [r0, r1]   // 将寄存器r3的值 存储到[r0+r1]地址中
+  adds  r1, r1, #4    // r1 移动4个字节，也就是32bits
     
 LoopCopyDataInit:
   ldr  r0, =_sdata
   ldr  r3, =_edata
-  adds  r2, r0, r1
+  adds  r2, r0, r1 /* r2 = r0 + r1 三操作数是在这种汇编语法风格下才有的 */
   cmp  r2, r3
   bcc  CopyDataInit
+  
+/*初始化bss段中的 静态变量和全局变量，也就是全为0 */
   ldr  r2, =_sbss
   b  LoopFillZerobss
 /* Zero fill the bss segment. */  
@@ -105,14 +125,18 @@ LoopFillZerobss:
   cmp  r2, r3
   bcc  FillZerobss
 
+
 /* Call the clock system intitialization function.*/
   bl  SystemInit   
 /* Call static constructors */
     /* bl __libc_init_array */
-/* Call the application's entry point.*/
+/* Call the application's entry point.
+  * 这里调用的Entry是 c语言的入口 进入这个函数之后就是c语言了
+*/
   bl  entry
+  /* main 函数结束后 如果没有死循环 就会运行到这里 */
   bx  lr    
-.size  Reset_Handler, .-Reset_Handler
+.size  Reset_Handler, .-Reset_Handler // 告诉连接器的位置
 
 /**
  * @brief  This is the code that gets called when the processor receives an 
@@ -126,12 +150,14 @@ Default_Handler:
 Infinite_Loop:
   b  Infinite_Loop
   .size  Default_Handler, .-Default_Handler
+
+
 /******************************************************************************
 *
 * The minimal vector table for a Cortex M3. Note that the proper constructs
 * must be placed on this to ensure that it ends up at physical address
 * 0x0000.0000.
-* 
+* 在指定的内存区域定义中断向量表
 *******************************************************************************/
    .section  .isr_vector,"a",%progbits
   .type  g_pfnVectors, %object

@@ -52,7 +52,9 @@ SECTIONS
         __rtatcmdtab_end = .;
         . = ALIGN(4);
 
-        /* section information for initial. */
+        /* section information for initial. 
+            通过宏定义实现的系统初始化 ！！！！ 
+        */
         . = ALIGN(4);
         __rt_init_start = .;
         KEEP(*(SORT(.rti_fn*)))
@@ -60,6 +62,7 @@ SECTIONS
 
         . = ALIGN(4);
 
+        /*__ctors_start__ 分配了 C++ 全局构造函数段的起始地址， __ctors_end__ 分配了 C++ 全局构造函数段的结束地址*/
         PROVIDE(__ctors_start__ = .);
         KEEP (*(SORT(.init_array.*)))
         KEEP (*(.init_array))
@@ -67,7 +70,7 @@ SECTIONS
 
         . = ALIGN(4);
 
-        _etext = .;
+        _etext = .; // _etext 存放代码段text的结束地址。
     } > ROM = 0
 
     /* .ARM.exidx is sorted, so has to go in its own output section.  */
